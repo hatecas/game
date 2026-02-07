@@ -20,9 +20,9 @@ canvas{display:block}
 .action-btn.locked{background:linear-gradient(180deg,#666 0%,#444 100%);border-color:#333;box-shadow:0 4px 0 #222,0 6px 12px rgba(0,0,0,0.3)}
 .action-btn .cost{font-size:11px;opacity:0.8;display:block}
 #message-popup{position:fixed;top:45%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.88);color:#ffd700;font-family:'Black Han Sans',sans-serif;font-size:24px;padding:16px 32px;border-radius:16px;border:2px solid #ffd700;z-index:100;display:none;text-align:center;pointer-events:none}
-#joystick-zone{position:fixed;bottom:80px;left:20px;width:140px;height:140px;z-index:20;pointer-events:auto}
-#joystick-base{position:absolute;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,0.15);border:3px solid rgba(255,255,255,0.3);left:10px;top:10px}
-#joystick-stick{position:absolute;width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,0.5);border:2px solid rgba(255,255,255,0.7);left:45px;top:45px}
+#joystick-zone{position:fixed;top:50%;left:12px;transform:translateY(-50%);width:100px;height:100px;z-index:20;pointer-events:auto}
+#joystick-base{position:absolute;width:90px;height:90px;border-radius:50%;background:rgba(255,255,255,0.15);border:3px solid rgba(255,255,255,0.3);left:5px;top:5px}
+#joystick-stick{position:absolute;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.5);border:2px solid rgba(255,255,255,0.7);left:30px;top:30px}
 #instructions{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.92);color:white;font-family:'Black Han Sans',sans-serif;padding:30px 40px;border-radius:20px;border:3px solid #4a9eff;z-index:200;text-align:center;max-width:420px}
 #instructions h2{color:#4a9eff;font-size:28px;margin-bottom:16px}
 #instructions p{font-family:'Noto Sans KR',sans-serif;font-size:14px;line-height:1.8;margin-bottom:6px;color:#ccc}
@@ -485,13 +485,13 @@ var jDir = {x:0, y:0}, jAct = false;
 window.addEventListener('keydown', function(e){keys[e.key.toLowerCase()]=true;});
 window.addEventListener('keyup', function(e){keys[e.key.toLowerCase()]=false;});
 var jZ=document.getElementById('joystick-zone'), jS=document.getElementById('joystick-stick'), jB=document.getElementById('joystick-base');
-function hJ(cx2,cy2){var r=jB.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;var dx=cx2-cx,dy=cy2-cy;var d=Math.sqrt(dx*dx+dy*dy),m=40;if(d>m){dx=dx/d*m;dy=dy/d*m;}jS.style.left=(45+dx)+'px';jS.style.top=(45+dy)+'px';jDir.x=dx/m;jDir.y=dy/m;}
+function hJ(cx2,cy2){var r=jB.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;var dx=cx2-cx,dy=cy2-cy;var d=Math.sqrt(dx*dx+dy*dy),m=30;if(d>m){dx=dx/d*m;dy=dy/d*m;}jS.style.left=(30+dx)+'px';jS.style.top=(30+dy)+'px';jDir.x=dx/m;jDir.y=dy/m;}
 jZ.addEventListener('touchstart',function(e){e.preventDefault();jAct=true;hJ(e.touches[0].clientX,e.touches[0].clientY);});
 jZ.addEventListener('touchmove',function(e){e.preventDefault();if(jAct)hJ(e.touches[0].clientX,e.touches[0].clientY);});
-jZ.addEventListener('touchend',function(){jAct=false;jDir={x:0,y:0};jS.style.left='45px';jS.style.top='45px';});
+jZ.addEventListener('touchend',function(){jAct=false;jDir={x:0,y:0};jS.style.left='30px';jS.style.top='30px';});
 jZ.addEventListener('mousedown',function(e){jAct=true;hJ(e.clientX,e.clientY);});
 window.addEventListener('mousemove',function(e){if(jAct)hJ(e.clientX,e.clientY);});
-window.addEventListener('mouseup',function(){jAct=false;jDir={x:0,y:0};jS.style.left='45px';jS.style.top='45px';});
+window.addEventListener('mouseup',function(){jAct=false;jDir={x:0,y:0};jS.style.left='30px';jS.style.top='30px';});
 
 // ═══ ACTIONS ═══
 function showMsg(t,d){d=d||1500;var p=document.getElementById('message-popup');p.textContent=t;p.style.display='block';setTimeout(function(){p.style.display='none';},d);}
