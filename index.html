@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Arctic Survival Tycoon 3D</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{overflow:hidden;background:#1a2a3a;font-family:'Noto Sans KR',sans-serif;user-select:none;-webkit-user-select:none;touch-action:none}
+canvas{display:block}
+#ui-overlay{position:fixed;top:0;left:0;right:0;pointer-events:none;z-index:10}
+#top-bar{display:flex;justify-content:space-between;align-items:flex-start;padding:12px 16px}
+.resource-panel{display:flex;gap:8px;pointer-events:auto;flex-wrap:wrap}
+.resource-item{background:rgba(0,0,0,0.75);border:2px solid rgba(255,255,255,0.2);border-radius:12px;padding:6px 14px;display:flex;align-items:center;gap:6px;color:white;font-family:'Black Han Sans',sans-serif;font-size:18px;backdrop-filter:blur(8px)}
+.resource-icon{font-size:20px}
+#bottom-bar{position:fixed;bottom:0;left:0;right:0;display:flex;justify-content:center;gap:10px;padding:12px 16px;pointer-events:none;z-index:10;flex-wrap:wrap}
+.action-btn{pointer-events:auto;background:linear-gradient(180deg,#4a9eff 0%,#2a6ecc 100%);border:3px solid #1a4e9c;border-radius:14px;color:white;font-family:'Black Han Sans',sans-serif;font-size:13px;padding:10px 14px;cursor:pointer;box-shadow:0 4px 0 #1a3a6c,0 6px 12px rgba(0,0,0,0.3);transition:transform 0.1s;text-align:center;min-width:72px}
+.action-btn:active{transform:translateY(2px);box-shadow:0 2px 0 #1a3a6c}
+.action-btn.locked{background:linear-gradient(180deg,#666 0%,#444 100%);border-color:#333;box-shadow:0 4px 0 #222,0 6px 12px rgba(0,0,0,0.3)}
+.action-btn .cost{font-size:11px;opacity:0.8;display:block}
+#message-popup{position:fixed;top:45%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.88);color:#ffd700;font-family:'Black Han Sans',sans-serif;font-size:24px;padding:16px 32px;border-radius:16px;border:2px solid #ffd700;z-index:100;display:none;text-align:center;pointer-events:none}
+#joystick-zone{position:fixed;bottom:80px;left:20px;width:140px;height:140px;z-index:20;pointer-events:auto}
+#joystick-base{position:absolute;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,0.15);border:3px solid rgba(255,255,255,0.3);left:10px;top:10px}
+#joystick-stick{position:absolute;width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,0.5);border:2px solid rgba(255,255,255,0.7);left:45px;top:45px}
+#instructions{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.92);color:white;font-family:'Black Han Sans',sans-serif;padding:30px 40px;border-radius:20px;border:3px solid #4a9eff;z-index:200;text-align:center;max-width:420px}
+#instructions h2{color:#4a9eff;font-size:28px;margin-bottom:16px}
+#instructions p{font-family:'Noto Sans KR',sans-serif;font-size:14px;line-height:1.8;margin-bottom:6px;color:#ccc}
+.key{background:#4a9eff;color:white;padding:2px 8px;border-radius:4px;font-size:12px}
+#start-btn{margin-top:20px;background:linear-gradient(180deg,#ff6a4a 0%,#cc3a2a 100%);border:3px solid #992a1a;border-radius:14px;color:white;font-family:'Black Han Sans',sans-serif;font-size:22px;padding:12px 40px;cursor:pointer;box-shadow:0 4px 0 #661a10}
+</style>
+</head>
+<body>
+<div id="instructions">
+  <h2>🐻‍❄️ 북극 서바이벌 타이쿤 3D</h2>
+  <p>🎮 <span class="key">WASD</span> / <span class="key">방향키</span> / <span class="key">조이스틱</span> 이동</p>
+  <p>🪓 북극곰 근처 → 자동 사냥!</p>
+  <p>🥩 고기 줍기 → 🔥 모닥불에서 굽기</p>
+  <p>🏪 구운 고기 → 판매대 (손님이 줄서서 삼!)</p>
+  <p>👷 돈으로 일꾼 고용 & 🗺️ 맵 확장!</p>
+  <button id="start-btn" onclick="startGame()">게임 시작!</button>
+</div>
+<div id="ui-overlay"><div id="top-bar">
+  <div class="resource-panel">
+    <div class="resource-item"><span class="resource-icon">💰</span><span id="money-display">0</span></div>
+    <div class="resource-item"><span class="resource-icon">🥩</span><span id="meat-display">0</span></div>
+    <div class="resource-item"><span class="resource-icon">🍖</span><span id="cooked-display">0</span></div>
+  </div>
+  <div class="resource-panel">
+    <div class="resource-item"><span class="resource-icon">👷</span><span id="worker-display">0</span></div>
+    <div class="resource-item"><span class="resource-icon">🗺️</span><span id="map-display">Lv.1</span></div>
+  </div>
+</div></div>
+<div id="bottom-bar">
+  <button class="action-btn" onclick="hireWorker('hunter')" id="btn-hunter">🪓 사냥꾼<span class="cost">$50</span></button>
+  <button class="action-btn" onclick="hireWorker('cook')" id="btn-cook">🔥 요리사<span class="cost">$80</span></button>
+  <button class="action-btn" onclick="hireWorker('seller')" id="btn-seller">🏪 판매원<span class="cost">$120</span></button>
+  <button class="action-btn" onclick="expandMap()" id="btn-expand">🗺️ 맵확장<span class="cost" id="expand-cost">$200</span></button>
+</div>
+<div id="joystick-zone"><div id="joystick-base"></div><div id="joystick-stick"></div></div>
+<div id="message-popup"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+function mk(geo, mat, x, y, z, props) {
+  var m = new THREE.Mesh(geo, mat);
+  m.position.set(x, y, z);
+  if (props) {
+    if (props.castShadow) m.castShadow = true;
+    if (props.name) m.name = props.name;
+  }
+  return m;
+}
+
+// ═══ SCENE ═══
+var scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87CEEB);
+scene.fog = new THREE.FogExp2(0xc8ddf0, 0.008);
+var camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.1, 300);
+// FIXED ISOMETRIC-STYLE CAMERA - doesn't follow player, just pans
+var CAM_HEIGHT = 22;
+var CAM_DIST = 18;
+var CAM_ANGLE = Math.PI/4; // 45 degrees
+
+var renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.prepend(renderer.domElement);
+window.addEventListener('resize', function(){
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+scene.add(new THREE.AmbientLight(0x8899bb, 0.6));
+var dL = new THREE.DirectionalLight(0xffeedd, 1.0);
+dL.position.set(15, 25, 10);
+dL.castShadow = true;
+dL.shadow.mapSize.set(2048, 2048);
+dL.shadow.camera.left = -50; dL.shadow.camera.right = 50;
+dL.shadow.camera.top = 50; dL.shadow.camera.bottom = -50;
+scene.add(dL);
+scene.add(new THREE.HemisphereLight(0x88aacc, 0x445566, 0.4));
+
+// ═══ MATERIALS ═══
+var M = {
+  snow: new THREE.MeshLambertMaterial({color:0xe8eef4}),
+  white: new THREE.MeshLambertMaterial({color:0xffffff}),
+  skin: new THREE.MeshLambertMaterial({color:0xffcc88}),
+  blue: new THREE.MeshLambertMaterial({color:0x4488cc}),
+  red: new THREE.MeshLambertMaterial({color:0xcc4444}),
+  orange: new THREE.MeshLambertMaterial({color:0xee8833}),
+  green: new THREE.MeshLambertMaterial({color:0x44aa44}),
+  brownDk: new THREE.MeshLambertMaterial({color:0x6B4226}),
+  treeDk: new THREE.MeshLambertMaterial({color:0x2d5a27}),
+  treeLt: new THREE.MeshLambertMaterial({color:0x3a7a33}),
+  bear: new THREE.MeshLambertMaterial({color:0xf0f0f0}),
+  bearHit: new THREE.MeshLambertMaterial({color:0xffffff}),
+  nose: new THREE.MeshLambertMaterial({color:0x333333}),
+  meat: new THREE.MeshLambertMaterial({color:0xcc3333}),
+  fire: new THREE.MeshBasicMaterial({color:0xff6600}),
+  fireY: new THREE.MeshBasicMaterial({color:0xffcc00}),
+  stone: new THREE.MeshLambertMaterial({color:0x888888}),
+  awning: new THREE.MeshLambertMaterial({color:0xcc2222}),
+  wood: new THREE.MeshLambertMaterial({color:0xa07818}),
+  gold: new THREE.MeshBasicMaterial({color:0xffd700}),
+};
+
+// ═══ GAME STATE ═══
+var G = {money:0, rawMeat:0, cookedMeat:0, workers:{hunters:0,cooks:0,sellers:0}, mapLevel:1, mapSize:18, started:false, expandCost:200};
+var campPos = new THREE.Vector3(5, 0, 3);
+var sellPos = new THREE.Vector3(9, 0, -2);
+
+// ═══ GROUND ═══
+var groundGrp = new THREE.Group(); scene.add(groundGrp);
+function makeGround() {
+  while (groundGrp.children.length) groundGrp.remove(groundGrp.children[0]);
+  var geo = new THREE.PlaneGeometry(G.mapSize*2, G.mapSize*2, 40, 40);
+  var p = geo.attributes.position;
+  for (var i=0; i<p.count; i++) p.setZ(i, Math.random()*0.1);
+  geo.computeVertexNormals();
+  var gnd = new THREE.Mesh(geo, M.snow); gnd.rotation.x = -Math.PI/2; gnd.receiveShadow = true;
+  groundGrp.add(gnd);
+  var edge = new THREE.Mesh(new THREE.RingGeometry(G.mapSize-0.2, G.mapSize+1.5, 64),
+    new THREE.MeshLambertMaterial({color:0x99aabb, side:THREE.DoubleSide}));
+  edge.rotation.x = -Math.PI/2; edge.position.y = 0.01; groundGrp.add(edge);
+}
+makeGround();
+
+// ═══ SNOW ═══
+var SN=400, sA=new Float32Array(SN*3), sVel=new Float32Array(SN);
+for(var i=0;i<SN;i++){sA[i*3]=(Math.random()-0.5)*70;sA[i*3+1]=Math.random()*25;sA[i*3+2]=(Math.random()-0.5)*70;sVel[i]=0.015+Math.random()*0.025;}
+var sGeo=new THREE.BufferGeometry();sGeo.setAttribute('position',new THREE.BufferAttribute(sA,3));
+scene.add(new THREE.Points(sGeo,new THREE.PointsMaterial({color:0xffffff,size:0.12,transparent:true,opacity:0.7})));
+function updSnow(){var p=sGeo.attributes.position.array;for(var i=0;i<SN;i++){p[i*3+1]-=sVel[i];p[i*3]+=Math.sin(Date.now()*0.0008+i)*0.003;if(p[i*3+1]<0){p[i*3+1]=22;p[i*3]=(Math.random()-0.5)*70;p[i*3+2]=(Math.random()-0.5)*70;}}sGeo.attributes.position.needsUpdate=true;}
+
+// ═══ MODELS ═══
+function mkPerson(bMat, hMat, s) {
+  s = s || 1; hMat = hMat || M.skin;
+  var g = new THREE.Group();
+  g.add(mk(new THREE.CylinderGeometry(0.28*s,0.32*s,0.85*s,8), bMat, 0, 0.5*s, 0, {castShadow:true}));
+  g.add(mk(new THREE.SphereGeometry(0.22*s,8,8), hMat, 0, 1.08*s, 0, {castShadow:true}));
+  var eM = new THREE.MeshBasicMaterial({color:0x222222});
+  var eG = new THREE.SphereGeometry(0.035*s,4,4);
+  g.add(mk(eG, eM, -0.07*s, 1.12*s, 0.18*s));
+  g.add(mk(eG, eM, 0.07*s, 1.12*s, 0.18*s));
+  g.add(mk(new THREE.CylinderGeometry(0.055*s,0.055*s,0.45*s,4), bMat, 0.35*s, 0.75*s, 0, {name:'arm'}));
+  var lG = new THREE.CylinderGeometry(0.07*s,0.07*s,0.35*s,4);
+  g.add(mk(lG, bMat, -0.1*s, 0.18*s, 0, {name:'legL'}));
+  g.add(mk(lG, bMat, 0.1*s, 0.18*s, 0, {name:'legR'}));
+  return g;
+}
+
+function mkBear() {
+  var g = new THREE.Group();
+  var bd = mk(new THREE.SphereGeometry(0.7,10,8), M.bear, 0, 0.6, 0, {castShadow:true});
+  bd.scale.set(1.3, 0.85, 0.85); g.add(bd);
+  g.add(mk(new THREE.SphereGeometry(0.38,8,8), M.bear, 0.8, 0.95, 0, {castShadow:true}));
+  var eaG = new THREE.SphereGeometry(0.1,6,6);
+  g.add(mk(eaG, M.bear, 0.7, 1.35, 0.16));
+  g.add(mk(eaG, M.bear, 0.7, 1.35, -0.16));
+  g.add(mk(new THREE.SphereGeometry(0.09,6,6), M.nose, 1.15, 0.9, 0));
+  var eyM = new THREE.MeshBasicMaterial({color:0x111111}), eyG = new THREE.SphereGeometry(0.04,4,4);
+  g.add(mk(eyG, eyM, 1.0, 1.05, 0.16));
+  g.add(mk(eyG, eyM, 1.0, 1.05, -0.16));
+  var lG = new THREE.CylinderGeometry(0.13,0.13,0.4,6);
+  [[-0.3,0.2,0.3],[-0.3,0.2,-0.3],[0.35,0.2,0.3],[0.35,0.2,-0.3]].forEach(function(p){ g.add(mk(lG, M.bear, p[0], p[1], p[2], {castShadow:true})); });
+  var hpC = document.createElement('canvas'); hpC.width=64; hpC.height=8;
+  var hpT = new THREE.CanvasTexture(hpC);
+  var hp = new THREE.Sprite(new THREE.SpriteMaterial({map:hpT, transparent:true}));
+  hp.scale.set(1.3, 0.16, 1); hp.position.set(0, 1.7, 0); hp.name = 'hpBar'; hp.visible = false;
+  g.add(hp); g.userData = {hpC:hpC, hpT:hpT}; return g;
+}
+
+function mkCampfire() {
+  var g = new THREE.Group();
+  for (var i=0;i<8;i++){var a=i/8*Math.PI*2;var s=mk(new THREE.SphereGeometry(0.16,6,4),M.stone,Math.cos(a)*0.6,0.07,Math.sin(a)*0.6);s.scale.y=0.5;g.add(s);}
+  for (var i=0;i<3;i++){g.add(mk(new THREE.ConeGeometry(0.16-i*0.03,0.45+i*0.12,6),i<2?M.fire:M.fireY,0,0.35+i*0.15,0,{name:'fl'+i}));}
+  var pl=new THREE.PointLight(0xff6600,1.5,8);pl.position.set(0,0.8,0);g.add(pl);g.userData.pl=pl;
+  // Campfire label
+  var c=document.createElement('canvas');c.width=100;c.height=28;var cx=c.getContext('2d');
+  cx.fillStyle='#ff8800';cx.font='bold 16px sans-serif';cx.textAlign='center';cx.fillText('🔥 모닥불',50,20);
+  var lbl=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true}));
+  lbl.scale.set(1.8,0.5,1);lbl.position.set(0,2.0,0);g.add(lbl);
+  return g;
+}
+
+function mkSellStation() {
+  var g = new THREE.Group();
+  g.add(mk(new THREE.BoxGeometry(2.2,0.1,1), M.wood, 0, 0.7, 0, {castShadow:true}));
+  var lG = new THREE.CylinderGeometry(0.04,0.04,0.7,4);
+  [[-0.9,0.35,-0.38],[-0.9,0.35,0.38],[0.9,0.35,-0.38],[0.9,0.35,0.38]].forEach(function(p){g.add(mk(lG,M.brownDk,p[0],p[1],p[2]));});
+  var pG = new THREE.CylinderGeometry(0.035,0.035,1.6,4);
+  [[-1,0.8,-0.5],[-1,0.8,0.5],[1,0.8,-0.5],[1,0.8,0.5]].forEach(function(p){g.add(mk(pG,M.brownDk,p[0],p[1],p[2]));});
+  g.add(mk(new THREE.BoxGeometry(2.4,0.06,1.3), M.awning, 0, 1.65, 0, {castShadow:true}));
+  var c=document.createElement('canvas');c.width=128;c.height=32;var cx=c.getContext('2d');
+  cx.fillStyle='#cc2222';cx.fillRect(0,0,128,32);cx.fillStyle='#fff';cx.font='bold 18px sans-serif';cx.textAlign='center';cx.fillText('🏪 판매대',64,22);
+  var sign=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c)}));
+  sign.scale.set(2,0.5,1);sign.position.set(0,2.2,0);g.add(sign);
+  return g;
+}
+
+function mkTree() {
+  var g = new THREE.Group(); var s = 0.6+Math.random()*0.45;
+  g.add(mk(new THREE.CylinderGeometry(0.07*s,0.1*s,0.8*s,6), M.brownDk, 0, 0.4*s, 0, {castShadow:true}));
+  for (var i=0;i<3;i++){var r=(0.55-i*0.11)*s,h=(0.5-i*0.04)*s;
+    g.add(mk(new THREE.ConeGeometry(r,h,7), i%2?M.treeLt:M.treeDk, 0, (0.85+i*0.32)*s, 0, {castShadow:true}));}
+  g.add(mk(new THREE.ConeGeometry(0.18*s,0.22*s,6), M.white, 0, (0.85+2*0.32+0.22)*s, 0));
+  return g;
+}
+
+function mkMeatItem() {
+  var g = new THREE.Group();
+  var m = mk(new THREE.SphereGeometry(0.2,6,6), M.meat, 0, 0.13, 0, {castShadow:true});
+  m.scale.set(1.2, 0.6, 1); g.add(m);
+  var ring = new THREE.Mesh(new THREE.RingGeometry(0.2,0.4,16),
+    new THREE.MeshBasicMaterial({color:0xff6644,transparent:true,opacity:0.3,side:THREE.DoubleSide}));
+  ring.rotation.x=-Math.PI/2;ring.position.set(0,0.02,0);ring.name='glow';g.add(ring);
+  return g;
+}
+
+// ═══ FLOATING TEXT ═══
+var floats = [];
+function addFloat(pos, text, color) {
+  var c = document.createElement('canvas'); c.width=140; c.height=36;
+  var cx = c.getContext('2d'); cx.fillStyle = color || '#ffd700';
+  cx.font = 'bold 22px sans-serif'; cx.textAlign = 'center'; cx.fillText(text, 70, 28);
+  var sp = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c), transparent:true}));
+  sp.scale.set(1.6, 0.45, 1); sp.position.set(pos.x, pos.y+1.8, pos.z);
+  scene.add(sp); floats.push({sp:sp, life:65, mx:65});
+}
+function updFloats() {
+  for (var i=floats.length-1; i>=0; i--) {
+    var f = floats[i]; f.life--; f.sp.position.y += 0.012; f.sp.material.opacity = f.life/f.mx;
+    if (f.life<=0) { scene.remove(f.sp); floats.splice(i,1); }
+  }
+}
+
+// ═══ SALE EFFECTS - dollar bills flying ═══
+var sfx = [];
+function mkSaleFX(px, py, pz) {
+  var g = new THREE.Group(); g.position.set(px, py+1.2, pz);
+  // Dollar bill sprites
+  for (var i=0;i<6;i++) {
+    var bc = document.createElement('canvas'); bc.width=40; bc.height=20;
+    var bx = bc.getContext('2d');
+    bx.fillStyle='#22aa44'; bx.fillRect(0,0,40,20);
+    bx.fillStyle='#33cc55'; bx.fillRect(2,2,36,16);
+    bx.fillStyle='#fff'; bx.font='bold 12px sans-serif'; bx.textAlign='center'; bx.fillText('$',20,15);
+    var billSp = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(bc), transparent:true}));
+    billSp.scale.set(0.5, 0.25, 1);
+    billSp.userData.v = new THREE.Vector3((Math.random()-0.5)*0.12, 0.04+Math.random()*0.08, (Math.random()-0.5)*0.12);
+    billSp.userData.rotSpd = (Math.random()-0.5)*0.15;
+    g.add(billSp);
+  }
+  // Gold coins
+  for (var i=0;i<8;i++) {
+    var coin = mk(new THREE.CylinderGeometry(0.07,0.07,0.02,8), M.gold, 0, 0, 0);
+    coin.rotation.x = Math.PI/2;
+    coin.userData.v = new THREE.Vector3((Math.random()-0.5)*0.1, 0.04+Math.random()*0.06, (Math.random()-0.5)*0.1);
+    g.add(coin);
+  }
+  // +$10 text with green glow
+  var c = document.createElement('canvas'); c.width=120; c.height=50; var cx = c.getContext('2d');
+  cx.shadowColor='#44ff44'; cx.shadowBlur=10;
+  cx.fillStyle='#44ff44'; cx.font='bold 36px sans-serif'; cx.textAlign='center'; cx.fillText('+$10',60,38);
+  var sp = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c), transparent:true}));
+  sp.scale.set(1.8, 0.75, 1); sp.position.set(0, 0.3, 0); sp.name = 'txt'; g.add(sp);
+  // Green ring burst
+  var ring = new THREE.Mesh(new THREE.RingGeometry(0.01,0.25,16),
+    new THREE.MeshBasicMaterial({color:0x44ff44,transparent:true,opacity:0.8,side:THREE.DoubleSide}));
+  ring.rotation.x=-Math.PI/2; ring.name='ring'; g.add(ring);
+  // Sparkle stars
+  for (var i=0;i<6;i++) {
+    var st = mk(new THREE.SphereGeometry(0.05,4,4), new THREE.MeshBasicMaterial({color:i%2?0xffff44:0x44ff44,transparent:true,opacity:0.9}), 0,0,0);
+    st.userData.v = new THREE.Vector3((Math.random()-0.5)*0.1, 0.03+Math.random()*0.05, (Math.random()-0.5)*0.1);
+    g.add(st);
+  }
+  scene.add(g); sfx.push({g:g, life:55, mx:55});
+}
+function updSFX() {
+  for (var i=sfx.length-1; i>=0; i--) {
+    var e = sfx[i]; e.life--; var t = 1-e.life/e.mx;
+    e.g.children.forEach(function(ch){
+      if(ch.userData&&ch.userData.v){
+        ch.position.add(ch.userData.v);
+        ch.userData.v.y-=0.0018;
+        ch.rotation.z+=ch.userData.rotSpd||0.08;
+        if(ch.material)ch.material.opacity=Math.max(0,(1-t));
+      }
+    });
+    var txt=e.g.getObjectByName('txt');if(txt){txt.position.y+=0.02;txt.material.opacity=1-t;}
+    var ring=e.g.getObjectByName('ring');if(ring){var s2=0.2+t*3;ring.scale.set(s2,s2,s2);ring.material.opacity=0.8*(1-t);}
+    if(e.life<=0){scene.remove(e.g);sfx.splice(i,1);}
+  }
+}
+
+// ═══ COOK EFFECTS - fire burst + sizzle ═══
+var cookFX = [];
+function mkCookFX(px, py, pz) {
+  var g = new THREE.Group(); g.position.set(px, py+0.6, pz);
+  // Fire column burst
+  for (var i=0;i<4;i++) {
+    var flame = mk(new THREE.ConeGeometry(0.12-i*0.02, 0.4+i*0.1, 6),
+      new THREE.MeshBasicMaterial({color:i<2?0xff4400:0xffaa00, transparent:true, opacity:0.8}), 
+      (Math.random()-0.5)*0.2, i*0.15, (Math.random()-0.5)*0.2);
+    flame.userData.v = new THREE.Vector3(0, 0.02+Math.random()*0.02, 0);
+    flame.userData.grow = 1.03;
+    g.add(flame);
+  }
+  // Steam puffs rising
+  for (var i=0;i<8;i++) {
+    var puff = mk(new THREE.SphereGeometry(0.06+Math.random()*0.05,6,6),
+      new THREE.MeshBasicMaterial({color:0xeeeeee,transparent:true,opacity:0.5}), 
+      (Math.random()-0.5)*0.3, 0.3+Math.random()*0.3, (Math.random()-0.5)*0.3);
+    puff.userData.v = new THREE.Vector3((Math.random()-0.5)*0.01, 0.015+Math.random()*0.02, (Math.random()-0.5)*0.01);
+    puff.userData.grow = 1.025+Math.random()*0.01;
+    g.add(puff);
+  }
+  // Orange/red sparks
+  for (var i=0;i<10;i++) {
+    var spark = mk(new THREE.SphereGeometry(0.03,4,4),
+      new THREE.MeshBasicMaterial({color:i%3===0?0xffff00:i%3===1?0xff6600:0xff2200, transparent:true, opacity:1}), 0, 0.2, 0);
+    spark.userData.v = new THREE.Vector3((Math.random()-0.5)*0.1, 0.04+Math.random()*0.08, (Math.random()-0.5)*0.1);
+    g.add(spark);
+  }
+  // 🍖+1 text
+  var c = document.createElement('canvas'); c.width=100; c.height=50; var cx = c.getContext('2d');
+  cx.shadowColor='#ff6600'; cx.shadowBlur=8;
+  cx.fillStyle='#ffcc00'; cx.font='bold 30px sans-serif'; cx.textAlign='center'; cx.fillText('🍖 +1',50,38);
+  var sp = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c), transparent:true}));
+  sp.scale.set(1.5, 0.75, 1); sp.position.set(0, 0.8, 0); sp.name = 'txt'; g.add(sp);
+  // Fire ring expanding
+  var ring = new THREE.Mesh(new THREE.RingGeometry(0.01,0.35,16),
+    new THREE.MeshBasicMaterial({color:0xff6600,transparent:true,opacity:0.8,side:THREE.DoubleSide}));
+  ring.rotation.x=-Math.PI/2; ring.name='ring'; g.add(ring);
+  scene.add(g); cookFX.push({g:g, life:60, mx:60});
+}
+function updCookFX() {
+  for (var i=cookFX.length-1; i>=0; i--) {
+    var e = cookFX[i]; e.life--; var t = 1-e.life/e.mx;
+    e.g.children.forEach(function(ch){
+      if(ch.userData&&ch.userData.v){
+        ch.position.add(ch.userData.v);
+        ch.userData.v.y -= 0.0003;
+        if(ch.userData.grow) ch.scale.multiplyScalar(ch.userData.grow);
+        if(ch.material) ch.material.opacity = Math.max(0,(1-t*1.2));
+      }
+    });
+    var txt=e.g.getObjectByName('txt');if(txt){txt.position.y+=0.018;txt.material.opacity=Math.max(0,1-t*1.3);}
+    var ring=e.g.getObjectByName('ring');if(ring){var s3=0.3+t*2.5;ring.scale.set(s3,s3,s3);ring.material.opacity=0.8*(1-t);}
+    if(e.life<=0){scene.remove(e.g);cookFX.splice(i,1);}
+  }
+}
+
+// ═══ ENTITIES ═══
+var bears=[], meats=[], workers=[], trees3D=[], customers=[];
+var campObj, sellObj;
+var bearSpawnsBase=[
+  {x:-6,z:-4},{x:-8,z:3},{x:-5,z:7},{x:-10,z:-1},
+  {x:-3,z:-8},{x:-12,z:-5},{x:-7,z:-7},{x:-4,z:5},
+  {x:-9,z:6},{x:-11,z:1},{x:-6,z:9},{x:-13,z:-3},
+  {x:-2,z:-6},{x:-8,z:-9},{x:-14,z:2}
+];
+
+function getBearSpawns(){
+  var s=bearSpawnsBase.slice();
+  // Each map level adds 8 more bears in the expanded area
+  for(var lv=2;lv<=G.mapLevel;lv++){
+    var ring=10+(lv-1)*6;
+    for(var i=0;i<8;i++){
+      var a=i/8*Math.PI*2+(lv*0.5);
+      s.push({x:Math.cos(a)*ring, z:Math.sin(a)*ring});
+    }
+  }
+  return s;
+}
+
+function spawnBears(){
+  bears.forEach(function(b){scene.remove(b.mesh);}); bears=[];
+  getBearSpawns().forEach(function(sp){
+    var mesh=mkBear();mesh.position.set(sp.x+(Math.random()-0.5)*2,0,sp.z+(Math.random()-0.5)*2);scene.add(mesh);
+    bears.push({mesh:mesh,hp:8,maxHp:8,alive:true,respTimer:0,ox:sp.x,oz:sp.z,wAngle:Math.random()*Math.PI*2,wTimer:60,hitFlash:0});
+  });
+}
+
+function spawnTrees(){
+  trees3D.forEach(function(t){scene.remove(t);}); trees3D=[];
+  var n=15+G.mapLevel*5;
+  for(var i=0;i<n;i++){var t=mkTree();var r=G.mapSize-2;t.position.set((Math.random()-0.5)*r*2,0,(Math.random()-0.5)*r*2);
+    if(t.position.distanceTo(campPos)<3||t.position.distanceTo(sellPos)<3)t.position.x+=5;scene.add(t);trees3D.push(t);}
+}
+
+// ═══ CUSTOMERS - spawn in place, idle bounce ═══
+var custTimer=0, MAX_Q=6;
+function qPos(i){return{x:sellPos.x-1.2-i*1.0, z:sellPos.z+1.8};}
+
+function spawnCust(){
+  if(customers.length>=MAX_Q)return;
+  var cols=[0xddaa77,0xcc9966,0xbbcc88,0x99aabb,0xddbb88];
+  var mesh=mkPerson(new THREE.MeshLambertMaterial({color:cols[Math.floor(Math.random()*cols.length)]}),M.skin,0.75);
+  var tp=qPos(customers.length);
+  mesh.position.set(tp.x, 0, tp.z);
+  mesh.rotation.y = Math.PI/2; // face the counter
+  scene.add(mesh);
+  customers.push({mesh:mesh, state:'wait', timer:0, patience:800+Math.random()*400, buyTimer:0});
+}
+
+function updCustomers(){
+  custTimer++;
+  var rate = G.cookedMeat>0 ? 120 : 250;
+  if(custTimer>=rate && customers.length<MAX_Q){custTimer=0;spawnCust();}
+
+  for(var i=customers.length-1;i>=0;i--){
+    var c=customers[i];
+    // Idle bounce animation
+    c.mesh.position.y = Math.abs(Math.sin(Date.now()*0.003+i*1.5))*0.06;
+
+    if(c.state==='wait'){
+      c.timer++;
+      // patience check
+      if(c.timer>c.patience){
+        c.state='leave';
+        continue;
+      }
+      // First in queue buys ONLY if player is near sell station
+      var playerNearSell = dV(P.x,P.z,sellPos.x,sellPos.z) < 3.0;
+      if(i===0 && G.cookedMeat>0 && playerNearSell){
+        c.buyTimer++;
+        if(c.buyTimer>=60){
+          c.buyTimer=0;
+          G.cookedMeat--; G.money+=10;
+          mkSaleFX(sellPos.x, sellPos.y, sellPos.z);
+          addFloat(sellPos, '+$10', '#44ff44');
+          c.state='leave';
+        }
+      }
+    } else if(c.state==='leave'){
+      // Fade out and remove
+      c.mesh.scale.y *= 0.95;
+      c.mesh.position.y += 0.02;
+      if(c.mesh.scale.y < 0.1){
+        scene.remove(c.mesh);
+        customers.splice(i,1);
+        // Reposition remaining customers
+        for(var j=0;j<customers.length;j++){
+          var tp2=qPos(j);
+          customers[j].mesh.position.x = tp2.x;
+          customers[j].mesh.position.z = tp2.z;
+        }
+      }
+    }
+  }
+}
+
+// ═══ PLAYER ═══
+var playerMesh;
+var P = {x:0, z:0, vx:0, vz:0, tvx:0, tvz:0, speed:0.07, accel:0.1, decel:0.88, facing:0, attacking:false, atkT:0, anim:0};
+
+// ═══ INPUT ═══
+var keys = {};
+var jDir = {x:0, y:0}, jAct = false;
+window.addEventListener('keydown', function(e){keys[e.key.toLowerCase()]=true;});
+window.addEventListener('keyup', function(e){keys[e.key.toLowerCase()]=false;});
+var jZ=document.getElementById('joystick-zone'), jS=document.getElementById('joystick-stick'), jB=document.getElementById('joystick-base');
+function hJ(cx2,cy2){var r=jB.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;var dx=cx2-cx,dy=cy2-cy;var d=Math.sqrt(dx*dx+dy*dy),m=40;if(d>m){dx=dx/d*m;dy=dy/d*m;}jS.style.left=(45+dx)+'px';jS.style.top=(45+dy)+'px';jDir.x=dx/m;jDir.y=dy/m;}
+jZ.addEventListener('touchstart',function(e){e.preventDefault();jAct=true;hJ(e.touches[0].clientX,e.touches[0].clientY);});
+jZ.addEventListener('touchmove',function(e){e.preventDefault();if(jAct)hJ(e.touches[0].clientX,e.touches[0].clientY);});
+jZ.addEventListener('touchend',function(){jAct=false;jDir={x:0,y:0};jS.style.left='45px';jS.style.top='45px';});
+jZ.addEventListener('mousedown',function(e){jAct=true;hJ(e.clientX,e.clientY);});
+window.addEventListener('mousemove',function(e){if(jAct)hJ(e.clientX,e.clientY);});
+window.addEventListener('mouseup',function(){jAct=false;jDir={x:0,y:0};jS.style.left='45px';jS.style.top='45px';});
+
+// ═══ ACTIONS ═══
+function showMsg(t,d){d=d||1500;var p=document.getElementById('message-popup');p.textContent=t;p.style.display='block';setTimeout(function(){p.style.display='none';},d);}
+
+function hireWorker(type){
+  var costs={hunter:50,cook:80,seller:120},cost=costs[type];
+  if(G.money<cost)return showMsg('돈이 부족해요! 💸');
+  G.money-=cost;G.workers[type==='hunter'?'hunters':type==='cook'?'cooks':'sellers']++;
+  var mesh=mkPerson(type==='hunter'?M.orange:type==='cook'?M.red:M.green,M.skin);
+  mesh.position.set(P.x,0,P.z);scene.add(mesh);
+  workers.push({type:type,mesh:mesh,timer:0});
+  showMsg((type==='hunter'?'사냥꾼':type==='cook'?'요리사':'판매원')+' 고용! 💪');
+  addFloat(new THREE.Vector3(P.x,0,P.z),'-$'+cost,'#ff4444');
+}
+
+function expandMap(){
+  if(G.money<G.expandCost)return showMsg('돈이 부족해요! 💸');
+  G.money-=G.expandCost;G.mapLevel++;G.mapSize=18+(G.mapLevel-1)*8;G.expandCost=Math.floor(G.expandCost*1.8);
+  document.getElementById('expand-cost').textContent='$'+G.expandCost;
+  makeGround();spawnBears();spawnTrees();
+  showMsg('🗺️ 맵 확장! Lv.'+G.mapLevel);
+  addFloat(new THREE.Vector3(P.x,0,P.z),'MAP EXPANDED!','#4a9eff');
+  scene.fog.density=Math.max(0.003,0.008-G.mapLevel*0.001);
+  var s2=G.mapSize+10;dL.shadow.camera.left=-s2;dL.shadow.camera.right=s2;dL.shadow.camera.top=s2;dL.shadow.camera.bottom=-s2;dL.shadow.camera.updateProjectionMatrix();
+}
+
+function startGame(){
+  document.getElementById('instructions').style.display='none';G.started=true;
+  campObj=mkCampfire();campObj.position.copy(campPos);scene.add(campObj);
+  sellObj=mkSellStation();sellObj.position.copy(sellPos);scene.add(sellObj);
+  playerMesh=mkPerson(M.blue,M.skin);scene.add(playerMesh);
+  // Set initial camera
+  camera.position.set(P.x+CAM_DIST, CAM_HEIGHT, P.z+CAM_DIST);
+  camera.lookAt(P.x, 0, P.z);
+  spawnBears();spawnTrees();
+}
+
+// ═══ HELPERS ═══
+function dV(ax,az,bx,bz){return Math.sqrt((ax-bx)*(ax-bx)+(az-bz)*(az-bz));}
+var cookT = 0;
+var screenShake = 0;
+
+// Slash arc effect
+var slashFX = [];
+function mkSlashFX(x,y,z){
+  // Arc sweep mesh
+  var g = new THREE.Group();g.position.set(x,y,z);
+  // Multiple slash arcs
+  for(var i=0;i<3;i++){
+    var curve = new THREE.TorusGeometry(0.5+i*0.15, 0.03, 4, 12, Math.PI*0.8);
+    var mat = new THREE.MeshBasicMaterial({color:i===0?0xffffff:0xffaa44, transparent:true, opacity:0.9-i*0.2, side:THREE.DoubleSide});
+    var arc = new THREE.Mesh(curve, mat);
+    arc.rotation.x = Math.random()*0.5-0.25;
+    arc.rotation.z = Math.random()*0.5-0.25;
+    g.add(arc);
+  }
+  scene.add(g);slashFX.push({g:g,life:12,mx:12});
+}
+function updSlashFX(){
+  for(var i=slashFX.length-1;i>=0;i--){
+    var e=slashFX[i];e.life--;var t=1-e.life/e.mx;
+    e.g.scale.set(1+t*0.5,1+t*0.5,1+t*0.5);
+    e.g.children.forEach(function(ch){if(ch.material)ch.material.opacity=Math.max(0,(1-t)*0.9);});
+    if(e.life<=0){scene.remove(e.g);slashFX.splice(i,1);}
+  }
+}
+
+// Hit particles
+var hitParticles=[];
+function updHitParticles(){
+  for(var i=hitParticles.length-1;i>=0;i--){
+    var p=hitParticles[i];p.life--;
+    p.m.position.x+=p.m.userData.v.x;p.m.position.y+=p.m.userData.v.y;p.m.position.z+=p.m.userData.v.z;
+    p.m.userData.v.y-=0.004;
+    p.m.material.opacity=p.life/30;
+    if(p.life<=0){scene.remove(p.m);hitParticles.splice(i,1);}
+  }
+}
+
+// ═══ MAIN UPDATE ═══
+function update(){
+  if(!G.started)return;
+
+  // Input - WASD moves in screen-space directions (camera is fixed angle)
+  var sx=0, sy=0;
+  if(keys['w']||keys['arrowup'])sy-=1;
+  if(keys['s']||keys['arrowdown'])sy+=1;
+  if(keys['a']||keys['arrowleft'])sx-=1;
+  if(keys['d']||keys['arrowright'])sx+=1;
+  if(jAct){sx+=jDir.x;sy+=jDir.y;}
+  var len=Math.sqrt(sx*sx+sy*sy);
+
+  // Convert screen input to world movement (camera at 45 deg)
+  var mx=0,mz=0;
+  if(len>0){
+    var ns=sx/len,ny=sy/len;
+    // Screen right = world(+x,-z), Screen down = world(+x,+z)
+    mx = (ns+ny)*0.707;
+    mz = (-ns+ny)*0.707;
+    P.tvx=mx*P.speed; P.tvz=mz*P.speed;
+    P.facing=Math.atan2(mx,mz);
+  } else { P.tvx=0; P.tvz=0; }
+
+  P.vx+=(P.tvx-P.vx)*P.accel; P.vz+=(P.tvz-P.vz)*P.accel;
+  if(len===0){P.vx*=P.decel;P.vz*=P.decel;if(Math.abs(P.vx)<0.0004)P.vx=0;if(Math.abs(P.vz)<0.0004)P.vz=0;}
+  P.x+=P.vx; P.z+=P.vz;
+  var lim=G.mapSize-1;P.x=Math.max(-lim,Math.min(lim,P.x));P.z=Math.max(-lim,Math.min(lim,P.z));
+  playerMesh.position.set(P.x,0,P.z);
+  playerMesh.rotation.y=P.facing;
+  if(len>0){
+    P.anim++;playerMesh.position.y=Math.sin(P.anim*0.15)*0.05;
+    var lL=playerMesh.getObjectByName('legL'),lR=playerMesh.getObjectByName('legR');
+    if(lL)lL.rotation.x=Math.sin(P.anim*0.25)*0.5;if(lR)lR.rotation.x=-Math.sin(P.anim*0.25)*0.5;
+  }else{var lL2=playerMesh.getObjectByName('legL'),lR2=playerMesh.getObjectByName('legR');if(lL2)lL2.rotation.x=0;if(lR2)lR2.rotation.x=0;}
+
+  // CAMERA: completely fixed angle, rigid follow (no wobble)
+  camera.position.set(P.x + CAM_DIST, CAM_HEIGHT, P.z + CAM_DIST);
+  camera.lookAt(P.x, 0, P.z);
+
+  // ── BEARS (3x faster wandering) ──
+  P.attacking=false;
+  for(var bi=0;bi<bears.length;bi++){
+    var b=bears[bi];
+    if(!b.alive){b.respTimer--;if(b.respTimer<=0){b.alive=true;b.hp=b.maxHp;b.mesh.visible=true;b.mesh.position.set(b.ox+(Math.random()-0.5)*2,0,b.oz+(Math.random()-0.5)*2);}continue;}
+    if(b.hitFlash>0){b.hitFlash--;b.mesh.children.forEach(function(ch){if(ch.material===M.bear||ch.material===M.bearHit)ch.material=b.hitFlash%4<2?M.bearHit:M.bear;});
+      if(b.hitFlash===0)b.mesh.children.forEach(function(ch){if(ch.material===M.bearHit)ch.material=M.bear;});}
+    b.wTimer--;
+    if(b.wTimer<=0){b.wAngle=Math.random()*Math.PI*2;b.wTimer=50+Math.random()*80;}
+    // 3x bear speed
+    b.mesh.position.x+=Math.cos(b.wAngle)*0.021;
+    b.mesh.position.z+=Math.sin(b.wAngle)*0.021;
+    var dO=dV(b.mesh.position.x,b.mesh.position.z,b.ox,b.oz);
+    if(dO>4){b.mesh.position.x+=(b.ox-b.mesh.position.x)*0.02;b.mesh.position.z+=(b.oz-b.mesh.position.z)*0.02;}
+    b.mesh.rotation.y=b.wAngle;
+    b.mesh.position.y=Math.sin(Date.now()*0.003)*0.03;
+    // Leg animation for bear
+    var bLegs=b.mesh.children;
+    for(var li=7;li<=10;li++){if(bLegs[li])bLegs[li].position.y=0.2+Math.sin(Date.now()*0.006+li)*0.04;}
+
+    // HP bar
+    var hpB=b.mesh.getObjectByName('hpBar');
+    if(b.hp<b.maxHp){hpB.visible=true;var cv=b.mesh.userData.hpC,cx2=cv.getContext('2d');cx2.clearRect(0,0,64,8);cx2.fillStyle='#333';cx2.fillRect(0,0,64,8);cx2.fillStyle='#ff4444';cx2.fillRect(0,0,64*(b.hp/b.maxHp),8);b.mesh.userData.hpT.needsUpdate=true;}else{hpB.visible=false;}
+
+    // Player attack - EXTENDED RANGE 2.8 - HACK AND SLASH
+    var dp=dV(P.x,P.z,b.mesh.position.x,b.mesh.position.z);
+    if(dp<2.8){
+      P.attacking=true;P.atkT++;
+      // Face the bear
+      playerMesh.rotation.y=Math.atan2(b.mesh.position.x-P.x,b.mesh.position.z-P.z);
+      // Hack-and-slash arm swing: fast whip motion
+      var arm=playerMesh.getObjectByName('arm');
+      var swingPhase = (P.atkT%20)/20; // 0-1 cycle
+      if(arm){
+        if(swingPhase<0.3) arm.rotation.z = -1.2*(swingPhase/0.3); // wind up
+        else if(swingPhase<0.5) arm.rotation.z = -1.2+2.5*((swingPhase-0.3)/0.2); // slash down fast
+        else arm.rotation.z = 1.3*(1-(swingPhase-0.5)/0.5); // return
+      }
+      // Body lunge on hit frame
+      if(P.atkT%20<3){
+        var lx=Math.sin(playerMesh.rotation.y)*0.08;
+        var lz=Math.cos(playerMesh.rotation.y)*0.08;
+        playerMesh.position.x=P.x+lx;playerMesh.position.z=P.z+lz;
+      }
+      if(P.atkT%40===0){
+        b.hp--;b.hitFlash=12;
+        // Slash arc effect
+        mkSlashFX(b.mesh.position.x, 0.8, b.mesh.position.z);
+        // Hit particles - blood/ice
+        for(var pi=0;pi<6;pi++){
+          var pp=mk(new THREE.SphereGeometry(0.06,4,4),new THREE.MeshBasicMaterial({color:pi%2?0xff3333:0xffffff,transparent:true,opacity:0.9}),
+            b.mesh.position.x,0.8,b.mesh.position.z);
+          pp.userData.v=new THREE.Vector3((Math.random()-0.5)*0.15,0.05+Math.random()*0.1,(Math.random()-0.5)*0.15);
+          scene.add(pp);hitParticles.push({m:pp,life:30});
+        }
+        // Screen shake
+        screenShake=6;
+        addFloat(new THREE.Vector3(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z),'💥 -1','#ff4444');
+        // Bear knockback
+        var kbAngle=Math.atan2(b.mesh.position.z-P.z,b.mesh.position.x-P.x);
+        b.mesh.position.x+=Math.cos(kbAngle)*0.3;
+        b.mesh.position.z+=Math.sin(kbAngle)*0.3;
+        if(b.hp<=0){b.alive=false;b.mesh.visible=false;b.respTimer=500;
+          var mm=mkMeatItem();mm.position.copy(b.mesh.position);scene.add(mm);
+          meats.push({mesh:mm,amount:2+Math.floor(Math.random()*2)});
+          addFloat(new THREE.Vector3(b.mesh.position.x,b.mesh.position.y,b.mesh.position.z),'🥩 고기!','#ff6644');
+          screenShake=10;
+        }
+      }
+    }
+  }
+  if(!P.attacking){P.atkT=0;var arm2=playerMesh.getObjectByName('arm');if(arm2)arm2.rotation.z=0;}
+
+  // ── PICK UP MEAT ──
+  for(var mi=meats.length-1;mi>=0;mi--){
+    var m=meats[mi];m.mesh.position.y=0.13+Math.sin(Date.now()*0.004+mi)*0.08;
+    var gl=m.mesh.getObjectByName('glow');if(gl)gl.rotation.z=Date.now()*0.002;
+    if(dV(P.x,P.z,m.mesh.position.x,m.mesh.position.z)<1.3){
+      G.rawMeat+=m.amount;addFloat(new THREE.Vector3(m.mesh.position.x,m.mesh.position.y,m.mesh.position.z),'+'+m.amount+' 🥩','#ff8844');
+      scene.remove(m.mesh);meats.splice(mi,1);
+    }
+  }
+
+  // ── COOK with fancy effect ──
+  var dpC=dV(P.x,P.z,campPos.x,campPos.z);
+  if(dpC<2.5&&G.rawMeat>0){cookT++;if(cookT%120===0){G.rawMeat--;G.cookedMeat++;mkCookFX(campPos.x,campPos.y,campPos.z);}}
+  else if(dpC>=2.5)cookT=0;
+
+  // Campfire flicker
+  if(campObj){for(var fi=0;fi<3;fi++){var f=campObj.getObjectByName('fl'+fi);if(f){f.position.x=Math.sin(Date.now()*0.01+fi*2)*0.06;f.position.z=Math.cos(Date.now()*0.012+fi*3)*0.06;f.scale.y=0.8+Math.sin(Date.now()*0.015+fi)*0.3;}}campObj.userData.pl.intensity=1.2+Math.sin(Date.now()*0.01)*0.4;}
+
+  // Customers & selling
+  updCustomers();
+
+  // Workers
+  for(var wi=0;wi<workers.length;wi++){
+    var w=workers[wi];
+    if(w.type==='hunter'){
+      var nB=null,nD=999;
+      for(var bj=0;bj<bears.length;bj++){if(!bears[bj].alive)continue;var dd=dV(w.mesh.position.x,w.mesh.position.z,bears[bj].mesh.position.x,bears[bj].mesh.position.z);if(dd<nD){nD=dd;nB=bears[bj];}}
+      if(nB&&nD>2.8){var dx=nB.mesh.position.x-w.mesh.position.x,dz=nB.mesh.position.z-w.mesh.position.z,d=Math.sqrt(dx*dx+dz*dz);
+        w.mesh.position.x+=dx/d*0.035;w.mesh.position.z+=dz/d*0.035;w.mesh.rotation.y=Math.atan2(dx,dz);w.mesh.position.y=Math.sin(Date.now()*0.007)*0.04;
+        var wlL=w.mesh.getObjectByName('legL'),wlR=w.mesh.getObjectByName('legR');if(wlL)wlL.rotation.x=Math.sin(Date.now()*0.01)*0.4;if(wlR)wlR.rotation.x=-Math.sin(Date.now()*0.01)*0.4;
+      }else if(nB){w.timer++;var arm3=w.mesh.getObjectByName('arm');if(arm3)arm3.rotation.z=Math.sin(w.timer*0.15)*0.8;
+        if(w.timer%50===0){nB.hp--;nB.hitFlash=12;addFloat(new THREE.Vector3(nB.mesh.position.x,nB.mesh.position.y,nB.mesh.position.z),'💥','#ff4444');
+          if(nB.hp<=0){nB.alive=false;nB.mesh.visible=false;nB.respTimer=500;G.rawMeat+=2;addFloat(new THREE.Vector3(nB.mesh.position.x,nB.mesh.position.y,nB.mesh.position.z),'+2 🥩','#ff6644');}}}
+    }else if(w.type==='cook'){
+      var dx2=campPos.x-w.mesh.position.x,dz2=campPos.z-w.mesh.position.z,d2=Math.sqrt(dx2*dx2+dz2*dz2);
+      if(d2>1.2){w.mesh.position.x+=dx2/d2*0.035;w.mesh.position.z+=dz2/d2*0.035;w.mesh.rotation.y=Math.atan2(dx2,dz2);}
+      w.timer++;if(w.timer%100===0&&G.rawMeat>0){G.rawMeat--;G.cookedMeat++;mkCookFX(campPos.x,campPos.y,campPos.z);}
+    }else if(w.type==='seller'){
+      // Seller stands at sell station and auto-sells to waiting customers
+      var dx3=sellPos.x+1-w.mesh.position.x,dz3=sellPos.z-w.mesh.position.z,d3=Math.sqrt(dx3*dx3+dz3*dz3);
+      if(d3>0.8){w.mesh.position.x+=dx3/d3*0.035;w.mesh.position.z+=dz3/d3*0.035;w.mesh.rotation.y=Math.atan2(dx3,dz3);}
+      w.timer++;if(w.timer%55===0&&customers.length>0&&G.cookedMeat>0){
+        var first=customers[0];if(first.state==='wait'){G.cookedMeat--;G.money+=10;mkSaleFX(sellPos.x,sellPos.y,sellPos.z);addFloat(sellPos,'+$10','#44ff44');first.state='leave';}}
+    }
+  }
+
+  // Effects
+  updSFX(); updCookFX(); updSlashFX(); updHitParticles(); updFloats(); updSnow();
+
+  // Screen shake
+  if(screenShake>0){
+    screenShake--;
+    camera.position.x += (Math.random()-0.5)*screenShake*0.03;
+    camera.position.z += (Math.random()-0.5)*screenShake*0.03;
+  }
+
+  // UI
+  document.getElementById('money-display').textContent=G.money;
+  document.getElementById('meat-display').textContent=G.rawMeat;
+  document.getElementById('cooked-display').textContent=G.cookedMeat;
+  document.getElementById('worker-display').textContent=G.workers.hunters+G.workers.cooks+G.workers.sellers;
+  document.getElementById('map-display').textContent='Lv.'+G.mapLevel;
+  document.getElementById('btn-hunter').className=G.money>=50?'action-btn':'action-btn locked';
+  document.getElementById('btn-cook').className=G.money>=80?'action-btn':'action-btn locked';
+  document.getElementById('btn-seller').className=G.money>=120?'action-btn':'action-btn locked';
+  document.getElementById('btn-expand').className=G.money>=G.expandCost?'action-btn':'action-btn locked';
+}
+
+function animate(){requestAnimationFrame(animate);update();renderer.render(scene,camera);}
+animate();
+</script>
+</body>
+</html>
